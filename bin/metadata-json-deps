@@ -6,6 +6,36 @@ require 'metadata_json_deps'
 options = {}
 OptionParser.new do |opts|
   opts.on("-v", "--[no-]verbose", "Run verbosely")
+  opts.on("-f", "--format FORMAT", %w[text json], "Output format: text (default) or json")
 end.parse!(into: options)
 
-exit(MetadataJsonDeps.run(ARGV, options[:verbose]))
+if options[:format] == 'json'
+  require 'json'
+
+  results = MetadataJsonDeps.check(ARGV)
+  exit_code = results.reduce(0) { |code, f| code | f[:exit_code] }
+
+  doc = {
+    'files' => results.map do |file|
+      {
+        'path' => file[:filename],
+        'dependencies' => file[:dependencies].map do |dep|
+          entry = {
+            'name' => dep[:name].to_s,
+            'version_requirement' => dep[:constraint].to_s,
+            'status' => dep[:status].to_s,
+          }
+          entry['current_release'] = dep[:current_release].to_s if dep[:current_release]
+          entry['superseded_by'] = dep[:superseded_by] if dep[:superseded_by]
+          entry['deprecated_for'] = dep[:deprecated_for] if dep[:deprecated_for]
+          entry
+        end,
+      }
+    end,
+  }
+
+  puts JSON.pretty_generate(doc)
+  exit(exit_code)
+else
+  exit(MetadataJsonDeps.run(ARGV, options[:verbose]))
+end
