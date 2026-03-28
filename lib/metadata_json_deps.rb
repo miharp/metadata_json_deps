@@ -90,9 +90,8 @@ module MetadataJsonDeps
     filenames.map do |filename|
       metadata = PuppetMetadata.read(filename)
       file_exit_code = 0
-      dependencies = []
 
-      metadata.dependencies.each do |dependency, constraint|
+      dependencies = metadata.dependencies.map do |dependency, constraint|
         mod = forge.get_module(dependency)
 
         if mod.deprecated_at
@@ -100,15 +99,15 @@ module MetadataJsonDeps
           dep = {name: dependency, constraint: constraint, status: :deprecated}
           dep[:superseded_by] = mod.superseded_by[:slug] if mod.superseded_by
           dep[:deprecated_for] = mod.deprecated_for if mod.deprecated_for
-          dependencies << dep
+          dep
         else
           current = mod.current_release.version
 
           if metadata.satisfies_dependency?(dependency, current)
-            dependencies << {name: dependency, constraint: constraint, status: :ok, current_release: current}
+            {name: dependency, constraint: constraint, status: :ok, current_release: current}
           else
             file_exit_code |= 1
-            dependencies << {name: dependency, constraint: constraint, status: :outdated, current_release: current}
+            {name: dependency, constraint: constraint, status: :outdated, current_release: current}
           end
         end
       end
